@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Network } from 'vis-network';
 
-const options = {
+const getOptions = (isSmallScreen) => ({
   layout: {
     hierarchical: {
-      direction: 'LR',
+      direction: isSmallScreen ? 'UD' : 'LR',
       sortMethod: 'directed',
-      levelSeparation: 350,
+      levelSeparation: isSmallScreen ? 150 : 350,
     },
   },
   edges: {
@@ -17,7 +17,7 @@ const options = {
   nodes: {
     shape: 'box',
     margin: 10,
-    font: { size: 22, color: '#333' },
+    font: { size: isSmallScreen ? 12 : 22, color: '#333' },
     shadow: true,
   },
   groups: {
@@ -28,16 +28,15 @@ const options = {
   interaction: {
     hover: true,
     zoomView: false,
-    dragView: true,
+    dragView: false,
     navigationButtons: true,
   },
-};
+});
 
 // Función MEJORADA para convertir Map a objeto
 const convertMapToObject = (map) => {
   if (!map) return {};
-  
-  console.log("🔄 Converting Map:", map);
+
   
   // Si es un Map de JavaScript
   if (map instanceof Map) {
@@ -68,6 +67,15 @@ const GraphViewer = ({ model }) => {
   const [selectedNode, setSelectedNode] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [tooltipDirection, setTooltipDirection] = useState('top'); // 'top', 'bottom', 'left', 'right'
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  const isSmallScreen = windowWidth < 768;
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Función para calcular la posición óptima del tooltip
   const calculateOptimalPosition = (nodePosition, tooltipWidth = 320, tooltipHeight = 300) => {
@@ -147,12 +155,9 @@ const GraphViewer = ({ model }) => {
           for (const node of data.nodes) {
             try {
               let cptData = await model.get_node_cpt(node.id);
-              console.log(`📊 RAW CPT for node ${node.id}:`, cptData);
-              
               // Procesar los datos CPT
               cptData = processCPTData(cptData);
-              cpts[node.id] = cptData;
-              console.log(`✅ PROCESSED CPT for node ${node.id}:`, cptData);
+              cpts[node.id] = cptData
             } catch (e) {
               console.warn(`No CPT for node ${node.id}`);
               cpts[node.id] = null;
@@ -196,8 +201,6 @@ const GraphViewer = ({ model }) => {
   const extractTableFromMap = (tableMap) => {
     if (!tableMap) return {};
     
-    console.log("🔍 Extracting table from:", tableMap);
-    
     const result = {};
     
     // Si es un Map
@@ -229,8 +232,6 @@ const GraphViewer = ({ model }) => {
         }
       });
     }
-    
-    console.log("📋 Extracted table result:", result);
     return result;
   };
 
@@ -246,7 +247,7 @@ const GraphViewer = ({ model }) => {
         edges: graphData.edges.map(e => ({ from: e.from, to: e.to })),
       };
 
-      const network = new Network(containerRef.current, networkData, options);
+      const network = new Network(containerRef.current, networkData, getOptions(isSmallScreen));
       networkRef.current = network;
       
       network.on("click", (params) => {
@@ -286,6 +287,13 @@ const GraphViewer = ({ model }) => {
       };
     }
   }, [graphData]);
+
+  useEffect(() => {
+    if (networkRef.current) {
+      networkRef.current.setOptions(getOptions(isSmallScreen));
+      networkRef.current.stabilize();
+    }
+  }, [isSmallScreen]);
 
   // Función mejorada para formatear claves
   const formatKey = (keyString) => {
@@ -450,8 +458,6 @@ const GraphViewer = ({ model }) => {
   };
 
   const renderCPTTable = (cptData) => {
-    console.log("🎨 Rendering CPT table with data:", cptData);
-    
     if (cptData.Discrete) return renderDiscreteCPT(cptData.Discrete);
     if (cptData.Binary) return renderBinaryCPT(cptData.Binary);
     return <div className="p-2 text-red-500">Formato desconocido</div>;
@@ -500,13 +506,6 @@ const GraphViewer = ({ model }) => {
     const possibleValues = discreteCPT.node_possible_values || [];
     const tableData = discreteCPT.table || {};
     const hasTableData = Object.keys(tableData).length > 0;
-
-    console.log("📊 Rendering Discrete CPT:", {
-      possibleValues,
-      tableData,
-      hasTableData,
-      entries: Object.entries(tableData)
-    });
 
     return (
       <div className="flex flex-col gap-3 p-1">
@@ -589,8 +588,8 @@ const GraphViewer = ({ model }) => {
   };
 
   return (
-    <div className="relative w-full">
-      <div className="border border-slate-300 rounded-lg bg-gray-50 shadow-inner" style={{ height: '500px' }}>
+    <div className="relative w-full h-full">
+      <div className="border border-slate-300 rounded-lg bg-gray-50 shadow-inner h-full min-h-[400px]">
         <div 
           ref={containerRef} 
           style={{ height: '100%', width: '100%' }}
