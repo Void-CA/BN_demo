@@ -6,8 +6,24 @@ const getOptions = (isSmallScreen) => ({
     hierarchical: {
       direction: isSmallScreen ? 'UD' : 'LR',
       sortMethod: 'directed',
-      levelSeparation: isSmallScreen ? 150 : 350,
+      levelSeparation: isSmallScreen ? 250 : 350,
     },
+  },
+  physics: isSmallScreen ? {
+    enabled: true,
+    barnesHut: {
+      gravitationalConstant: -1000,
+      centralGravity: 0.3,
+      springLength: 150,
+      springConstant: 0.04,
+    },
+    stabilization: {
+      iterations: 200,
+      updateInterval: 25,
+    },
+    minVelocity: 0.75,
+  } : {
+    enabled: false,
   },
   edges: {
     arrows: 'to',
@@ -17,8 +33,10 @@ const getOptions = (isSmallScreen) => ({
   nodes: {
     shape: 'box',
     margin: 10,
-    font: { size: isSmallScreen ? 12 : 22, color: '#333' },
+    size: isSmallScreen ? 20 : 30,
+    font: { size: isSmallScreen ? 18 : 22, color: '#333' },
     shadow: true,
+    physics: isSmallScreen,
   },
   groups: {
     Oculto: { color: { background: '#FFC72C', border: '#D99D00' }, font: { color: '#000' } },
@@ -27,36 +45,72 @@ const getOptions = (isSmallScreen) => ({
   },
   interaction: {
     hover: true,
-    zoomView: false,
-    dragView: false,
+    zoomView: isSmallScreen,
+    dragView: isSmallScreen,
     navigationButtons: true,
   },
 });
 
-// Función MEJORADA para convertir Map a objeto
-const convertMapToObject = (map) => {
-  if (!map) return {};
-
+// Función para procesar datos CPT
+const processCPTData = (cptData) => {
+  if (!cptData) return null;
   
-  // Si es un Map de JavaScript
-  if (map instanceof Map) {
-    const obj = {};
-    map.forEach((value, key) => {
-      // Convertir valores que también sean Maps
-      if (value instanceof Map) {
-        obj[key] = convertMapToObject(value);
-      } else if (typeof value === 'object' && value !== null) {
-        // Manejar objetos regulares
-        obj[key] = value;
-      } else {
-        obj[key] = value;
-      }
-    });
-    return obj;
+  const processed = {};
+  
+  // Procesar Discrete CPT
+  if (cptData.Discrete) {
+    processed.Discrete = {
+      node_possible_values: cptData.Discrete.node_possible_values || [],
+      table: extractTableFromMap(cptData.Discrete.table)
+    };
   }
   
-  // Si ya es un objeto, devolverlo tal cual
-  return map;
+  // Procesar Binary CPT
+  if (cptData.Binary) {
+    processed.Binary = {
+      table: cptData.Binary.table || []
+    };
+  }
+  
+  return processed;
+};
+
+// Función ESPECÍFICA para extraer tabla de Maps anidados
+const extractTableFromMap = (tableMap) => {
+  if (!tableMap) return {};
+  
+  const result = {};
+  
+  // Si es un Map
+  if (tableMap instanceof Map) {
+    tableMap.forEach((innerMap, parentKey) => {
+      if (innerMap instanceof Map) {
+        const distribution = {};
+        innerMap.forEach((probability, stateObj) => {
+          // stateObj es {Value: "Bajo"}, extraemos el valor
+          const stateKey = stateObj.Value || JSON.stringify(stateObj);
+          distribution[stateKey] = probability;
+        });
+        result[parentKey] = distribution;
+      }
+    });
+  } 
+  // Si ya es un objeto (por las conversiones anteriores)
+  else if (typeof tableMap === 'object') {
+    Object.entries(tableMap).forEach(([parentKey, innerMap]) => {
+      if (innerMap instanceof Map) {
+        const distribution = {};
+        innerMap.forEach((probability, stateObj) => {
+          const stateKey = stateObj.Value || JSON.stringify(stateObj);
+          distribution[stateKey] = probability;
+        });
+        result[parentKey] = distribution;
+      } else {
+        result[parentKey] = innerMap;
+      }
+    });
+  }
+  return result;
 };
 
 const GraphViewer = ({ model }) => {
@@ -158,7 +212,7 @@ const GraphViewer = ({ model }) => {
               // Procesar los datos CPT
               cptData = processCPTData(cptData);
               cpts[node.id] = cptData
-            } catch (e) {
+            } catch {
               console.warn(`No CPT for node ${node.id}`);
               cpts[node.id] = null;
             }
@@ -167,73 +221,11 @@ const GraphViewer = ({ model }) => {
         };
         
         loadCPTs();
-      } catch (e) {
-        console.error("Error loading graph structure:", e);
+      } catch {
+        console.error("Error loading graph structure");
       }
     }
   }, [model]);
-
-  // Función para procesar datos CPT
-  const processCPTData = (cptData) => {
-    if (!cptData) return null;
-    
-    const processed = {};
-    
-    // Procesar Discrete CPT
-    if (cptData.Discrete) {
-      processed.Discrete = {
-        node_possible_values: cptData.Discrete.node_possible_values || [],
-        table: extractTableFromMap(cptData.Discrete.table)
-      };
-    }
-    
-    // Procesar Binary CPT
-    if (cptData.Binary) {
-      processed.Binary = {
-        table: cptData.Binary.table || []
-      };
-    }
-    
-    return processed;
-  };
-
-  // Función ESPECÍFICA para extraer tabla de Maps anidados
-  const extractTableFromMap = (tableMap) => {
-    if (!tableMap) return {};
-    
-    const result = {};
-    
-    // Si es un Map
-    if (tableMap instanceof Map) {
-      tableMap.forEach((innerMap, parentKey) => {
-        if (innerMap instanceof Map) {
-          const distribution = {};
-          innerMap.forEach((probability, stateObj) => {
-            // stateObj es {Value: "Bajo"}, extraemos el valor
-            const stateKey = stateObj.Value || JSON.stringify(stateObj);
-            distribution[stateKey] = probability;
-          });
-          result[parentKey] = distribution;
-        }
-      });
-    } 
-    // Si ya es un objeto (por las conversiones anteriores)
-    else if (typeof tableMap === 'object') {
-      Object.entries(tableMap).forEach(([parentKey, innerMap]) => {
-        if (innerMap instanceof Map) {
-          const distribution = {};
-          innerMap.forEach((probability, stateObj) => {
-            const stateKey = stateObj.Value || JSON.stringify(stateObj);
-            distribution[stateKey] = probability;
-          });
-          result[parentKey] = distribution;
-        } else {
-          result[parentKey] = innerMap;
-        }
-      });
-    }
-    return result;
-  };
 
   useEffect(() => {
     if (graphData && containerRef.current) {
@@ -320,9 +312,9 @@ const GraphViewer = ({ model }) => {
       }
       
       return keyString;
-    } catch (e) {
+    } catch {
       // Si no es JSON válido, limpiar el string
-      return keyString === '[]' ? 'Raíz' : keyString.replace(/[\[\]"]/g, '');
+      return keyString === '[]' ? 'Raíz' : keyString.replace(/[[\]"]/g, '');
     }
   };
 

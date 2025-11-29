@@ -3,7 +3,7 @@ import GraphViewer from './GraphViewer';
 
 const GraphPanel = ({ model }) => {
   return (
-    <div className="flex-1 bg-white m-2 md:m-4 rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+    <div className="basis-[70%] bg-white m-2 md:m-4 rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
       <div className="p-4 border-b border-slate-200 bg-white shrink-0">
         <h2 className="text-lg font-semibold flex items-center text-slate-700">
           <FaMicroscope className="text-cyan-700 mr-2" />

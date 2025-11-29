@@ -2,8 +2,9 @@ import { FaChartPie, FaChartLine, FaSlidersH, FaExclamationTriangle } from 'reac
 import { SENSORES, OBJETIVOS } from '../config';
 
 const ControlPanel = ({ isSmallScreen, onShowGraphModal, evidence, onEvidenceChange, results }) => {
+  const basisClass = isSmallScreen ? 'basis-full' : 'basis-[30%]';
   return (
-    <div className="flex-1 md:w-96 bg-white m-2 md:m-4 rounded-xl shadow-lg border border-slate-200 overflow-y-auto flex flex-col">
+    <div className={`${basisClass} bg-white m-2 md:m-4 rounded-xl shadow-lg border border-slate-200 overflow-y-auto flex flex-col`}>
 
       {/* Encabezado del Panel Derecho */}
       <div className="p-4 border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white shrink-0">
